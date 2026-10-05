@@ -1,12 +1,12 @@
 # ⚡ PULSE API X
 
-> A modern, local-first API testing dashboard built with Flask, SQLite and vanilla JavaScript.
+> A modern, local-first API testing dashboard built with Flask, PostgreSQL and vanilla JavaScript.
 
 PULSE API X is a lightweight developer tool for sending HTTP requests, inspecting responses, managing environments, saving requests and reviewing request history — all from a clean web interface.
 
 ![Python](https://img.shields.io/badge/Python-3.11%2B-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-Web%20App-000000?logo=flask&logoColor=white)
-![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Database-003B57?logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
 ## ✨ Features
@@ -19,7 +19,7 @@ PULSE API X is a lightweight developer tool for sending HTTP requests, inspectin
 - 🕘 Request history with status, response time and size
 - 🔎 Pretty JSON, raw response and response-header inspection
 - 📋 cURL command generation and copy
-- 🗃️ SQLite persistence — no external database required
+- 🗃️ PostgreSQL persistence for local and Vercel deployments
 - 📦 Export saved data and environments as JSON
 - 📱 Responsive interface for desktop and mobile
 - 🌌 Neon/glass developer UI
@@ -197,3 +197,9 @@ Released under the MIT License. See [`LICENSE`](LICENSE).
 ## ⭐ Support
 
 If you find the project useful, consider starring the repository and opening an issue with feature requests or bug reports.
+
+## Vercel deployment
+
+The Vercel version uses PostgreSQL for persistent storage. Set `DATABASE_URL` in Vercel Environment Variables, then redeploy. See [`docs/VERCEL.md`](docs/VERCEL.md).
+
+Health check: `/api/health`
