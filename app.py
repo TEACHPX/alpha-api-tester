@@ -10,9 +10,9 @@ app = Flask(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_nmxOy1bVkv0Q@ep-shy-sky-b5ugtj4f-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require").strip()
 
 
-# --------------------------------------------------
+# ============================================================
 # DATABASE
-# --------------------------------------------------
+# ============================================================
 
 def db():
     if not DATABASE_URL:
@@ -20,54 +20,63 @@ def db():
 
     try:
         import psycopg
+
         return psycopg.connect(
             DATABASE_URL,
             connect_timeout=10
         )
+
     except ImportError:
-        raise RuntimeError("psycopg is not installed")
+        raise RuntimeError(
+            "psycopg is not installed"
+        )
 
 
 def init_db():
-    with db() as c:
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS requests(
-                id BIGSERIAL PRIMARY KEY,
-                name TEXT NOT NULL,
-                method TEXT NOT NULL,
-                url TEXT NOT NULL,
-                headers TEXT,
-                body TEXT,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-        """)
 
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS history(
-                id BIGSERIAL PRIMARY KEY,
-                method TEXT NOT NULL,
-                url TEXT NOT NULL,
-                status INTEGER,
-                ms DOUBLE PRECISION,
-                ok BOOLEAN,
-                created_at TIMESTAMPTZ DEFAULT NOW()
-            );
-        """)
+    with db() as conn:
 
-        c.execute("""
-            CREATE TABLE IF NOT EXISTS environments(
-                id BIGSERIAL PRIMARY KEY,
-                name TEXT UNIQUE NOT NULL,
-                variables TEXT
-            );
-        """)
+        with conn.cursor() as cur:
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS requests(
+                    id BIGSERIAL PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    method TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    headers TEXT,
+                    body TEXT,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS history(
+                    id BIGSERIAL PRIMARY KEY,
+                    method TEXT NOT NULL,
+                    url TEXT NOT NULL,
+                    status INTEGER,
+                    ms DOUBLE PRECISION,
+                    ok BOOLEAN,
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                );
+            """)
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS environments(
+                    id BIGSERIAL PRIMARY KEY,
+                    name TEXT UNIQUE NOT NULL,
+                    variables TEXT
+                );
+            """)
 
 
-# --------------------------------------------------
+# ============================================================
 # HELPERS
-# --------------------------------------------------
+# ============================================================
 
 def substitute(value, env):
+
     if not isinstance(value, str):
         return value
 
@@ -83,43 +92,56 @@ def substitute(value, env):
     )
 
 
-def safe_json(value, default=None):
-    try:
-        return json.loads(value)
-    except Exception:
-        return default
+def row_to_dicts(rows, description):
+
+    columns = [
+        column.name
+        for column in description
+    ]
+
+    return [
+        dict(zip(columns, row))
+        for row in rows
+    ]
 
 
-# --------------------------------------------------
+# ============================================================
 # DATABASE INITIALIZATION
-# --------------------------------------------------
+# ============================================================
 
 @app.before_request
 def ensure_database():
+
     if request.path.startswith("/api/") and DATABASE_URL:
+
         try:
             init_db()
+
         except Exception:
             pass
 
 
-# --------------------------------------------------
+# ============================================================
 # HOME
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/")
 def home():
-    return render_template("index.html")
+
+    return render_template(
+        "index.html"
+    )
 
 
-# --------------------------------------------------
+# ============================================================
 # HEALTH
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/api/health")
 def health():
 
     if not DATABASE_URL:
+
         return jsonify(
             success=False,
             database="not_configured",
@@ -127,8 +149,13 @@ def health():
         ), 503
 
     try:
-        with db() as c:
-            c.execute("SELECT 1")
+
+        with db() as conn:
+
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT 1"
+                )
 
         return jsonify(
             success=True,
@@ -136,6 +163,7 @@ def health():
         )
 
     except Exception as e:
+
         return jsonify(
             success=False,
             database="error",
@@ -143,27 +171,41 @@ def health():
         ), 503
 
 
-# --------------------------------------------------
+# ============================================================
 # SEND REQUEST
-# --------------------------------------------------
+# ============================================================
 
 @app.post("/api/send")
 def send():
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(
+        silent=True
+    ) or {}
 
     method = str(
-        data.get("method", "GET")
+        data.get(
+            "method",
+            "GET"
+        )
     ).upper()
 
-    env = data.get("environment") or {}
+    environment = (
+        data.get("environment")
+        or {}
+    )
 
     url = substitute(
-        str(data.get("url", "")).strip(),
-        env
+        str(
+            data.get(
+                "url",
+                ""
+            )
+        ).strip(),
+        environment
     )
 
     if not url:
+
         return jsonify(
             success=False,
             error="URL is required"
@@ -171,24 +213,41 @@ def send():
 
     try:
 
-        headers = data.get("headers") or {}
+        headers = (
+            data.get("headers")
+            or {}
+        )
 
-        if not isinstance(headers, dict):
+        if not isinstance(
+            headers,
+            dict
+        ):
+
             return jsonify(
                 success=False,
                 error="Headers must be a JSON object"
             ), 400
 
         headers = {
-            substitute(str(k), env):
-            substitute(str(v), env)
-            for k, v in headers.items()
+            substitute(
+                str(key),
+                environment
+            ):
+            substitute(
+                str(value),
+                environment
+            )
+            for key, value in headers.items()
         }
 
         body = data.get("body")
 
         if isinstance(body, str):
-            body = substitute(body, env)
+
+            body = substitute(
+                body,
+                environment
+            )
 
         options = {
             "headers": headers,
@@ -196,15 +255,27 @@ def send():
             "allow_redirects": True
         }
 
-        if method not in {
-            "GET",
-            "HEAD",
-            "OPTIONS"
-        } and body not in (None, ""):
+        if (
+            method not in {
+                "GET",
+                "HEAD",
+                "OPTIONS"
+            }
+            and body not in (
+                None,
+                ""
+            )
+        ):
 
-            if isinstance(body, (dict, list)):
+            if isinstance(
+                body,
+                (dict, list)
+            ):
+
                 options["json"] = body
+
             else:
+
                 options["data"] = body
 
         start = time.perf_counter()
@@ -216,34 +287,42 @@ def send():
         )
 
         elapsed = round(
-            (time.perf_counter() - start) * 1000,
+            (
+                time.perf_counter()
+                - start
+            ) * 1000,
             2
         )
 
         try:
+
             output = response.json()
             response_type = "json"
 
         except ValueError:
+
             output = response.text
             response_type = "text"
 
-        # History
-        with db() as c:
-            c.execute(
-                """
-                INSERT INTO history
-                (method,url,status,ms,ok)
-                VALUES(%s,%s,%s,%s,%s)
-                """,
-                (
-                    method,
-                    url,
-                    response.status_code,
-                    elapsed,
-                    response.ok
+        # Save history
+        with db() as conn:
+
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    """
+                    INSERT INTO history
+                    (method,url,status,ms,ok)
+                    VALUES(%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        method,
+                        url,
+                        response.status_code,
+                        elapsed,
+                        response.ok
+                    )
                 )
-            )
 
         return jsonify(
             success=True,
@@ -251,7 +330,9 @@ def send():
             reason=response.reason,
             response_time_ms=elapsed,
             response_type=response_type,
-            headers=dict(response.headers),
+            headers=dict(
+                response.headers
+            ),
             body=output
         )
 
@@ -277,34 +358,31 @@ def send():
         ), 500
 
 
-# --------------------------------------------------
+# ============================================================
 # SAVED REQUESTS
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/api/saved")
-def saved():
+def get_saved():
 
     try:
 
-        with db() as c:
+        with db() as conn:
 
-            rows = c.execute(
-                """
-                SELECT *
-                FROM requests
-                ORDER BY id DESC
-                """
-            ).fetchall()
+            with conn.cursor() as cur:
 
-            columns = [
-                x.name
-                for x in c.description
-            ]
+                cur.execute("""
+                    SELECT *
+                    FROM requests
+                    ORDER BY id DESC
+                """)
 
-        data = [
-            dict(zip(columns, row))
-            for row in rows
-        ]
+                rows = cur.fetchall()
+
+                data = row_to_dicts(
+                    rows,
+                    cur.description
+                )
 
         return jsonify(
             success=True,
@@ -323,14 +401,22 @@ def saved():
 @app.post("/api/saved")
 def save():
 
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(
+        silent=True
+    ) or {}
 
     name = str(
-        data.get("name", "")
+        data.get(
+            "name",
+            ""
+        )
     ).strip()
 
     url = str(
-        data.get("url", "")
+        data.get(
+            "url",
+            ""
+        )
     ).strip()
 
     if not name or not url:
@@ -342,25 +428,43 @@ def save():
 
     try:
 
-        with db() as c:
+        with db() as conn:
 
-            row = c.execute(
-                """
-                INSERT INTO requests
-                (name,method,url,headers,body)
-                VALUES(%s,%s,%s,%s,%s)
-                RETURNING id
-                """,
-                (
-                    name,
-                    data.get("method", "GET"),
-                    url,
-                    json.dumps(
-                        data.get("headers") or {}
-                    ),
-                    data.get("body", "")
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    """
+                    INSERT INTO requests
+                    (
+                        name,
+                        method,
+                        url,
+                        headers,
+                        body
+                    )
+                    VALUES(%s,%s,%s,%s,%s)
+                    RETURNING id
+                    """,
+                    (
+                        name,
+                        data.get(
+                            "method",
+                            "GET"
+                        ),
+                        url,
+                        json.dumps(
+                            data.get(
+                                "headers"
+                            ) or {}
+                        ),
+                        data.get(
+                            "body",
+                            ""
+                        )
+                    )
                 )
-            ).fetchone()
+
+                row = cur.fetchone()
 
         return jsonify(
             success=True,
@@ -380,11 +484,17 @@ def delete_saved(item_id):
 
     try:
 
-        with db() as c:
-            c.execute(
-                "DELETE FROM requests WHERE id=%s",
-                (item_id,)
-            )
+        with db() as conn:
+
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    """
+                    DELETE FROM requests
+                    WHERE id=%s
+                    """,
+                    (item_id,)
+                )
 
         return jsonify(
             success=True
@@ -398,35 +508,32 @@ def delete_saved(item_id):
         ), 500
 
 
-# --------------------------------------------------
+# ============================================================
 # HISTORY
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/api/history")
-def history():
+def get_history():
 
     try:
 
-        with db() as c:
+        with db() as conn:
 
-            rows = c.execute(
-                """
-                SELECT *
-                FROM history
-                ORDER BY id DESC
-                LIMIT 50
-                """
-            ).fetchall()
+            with conn.cursor() as cur:
 
-            columns = [
-                x.name
-                for x in c.description
-            ]
+                cur.execute("""
+                    SELECT *
+                    FROM history
+                    ORDER BY id DESC
+                    LIMIT 50
+                """)
 
-        data = [
-            dict(zip(columns, row))
-            for row in rows
-        ]
+                rows = cur.fetchall()
+
+                data = row_to_dicts(
+                    rows,
+                    cur.description
+                )
 
         return jsonify(
             success=True,
@@ -447,10 +554,13 @@ def clear_history():
 
     try:
 
-        with db() as c:
-            c.execute(
-                "DELETE FROM history"
-            )
+        with db() as conn:
+
+            with conn.cursor() as cur:
+
+                cur.execute(
+                    "DELETE FROM history"
+                )
 
         return jsonify(
             success=True
@@ -464,34 +574,31 @@ def clear_history():
         ), 500
 
 
-# --------------------------------------------------
+# ============================================================
 # ENVIRONMENTS
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/api/env")
 def get_environments():
 
     try:
 
-        with db() as c:
+        with db() as conn:
 
-            rows = c.execute(
-                """
-                SELECT *
-                FROM environments
-                ORDER BY name
-                """
-            ).fetchall()
+            with conn.cursor() as cur:
 
-            columns = [
-                x.name
-                for x in c.description
-            ]
+                cur.execute("""
+                    SELECT *
+                    FROM environments
+                    ORDER BY name
+                """)
 
-        data = [
-            dict(zip(columns, row))
-            for row in rows
-        ]
+                rows = cur.fetchall()
+
+                data = row_to_dicts(
+                    rows,
+                    cur.description
+                )
 
         return jsonify(
             success=True,
@@ -515,7 +622,10 @@ def save_environment():
     ) or {}
 
     name = str(
-        data.get("name", "")
+        data.get(
+            "name",
+            ""
+        )
     ).strip()
 
     if not name:
@@ -525,11 +635,15 @@ def save_environment():
             error="Environment name required"
         ), 400
 
-    variables = data.get(
-        "variables"
-    ) or {}
+    variables = (
+        data.get("variables")
+        or {}
+    )
 
-    if not isinstance(variables, dict):
+    if not isinstance(
+        variables,
+        dict
+    ):
 
         return jsonify(
             success=False,
@@ -538,26 +652,32 @@ def save_environment():
 
     try:
 
-        with db() as c:
+        with db() as conn:
 
-            c.execute(
-                """
-                INSERT INTO environments
-                (name,variables)
-                VALUES(%s,%s)
+            with conn.cursor() as cur:
 
-                ON CONFLICT(name)
-                DO UPDATE SET
-                variables=EXCLUDED.variables
-                """,
-                (
-                    name,
-                    json.dumps(
-                        variables,
-                        ensure_ascii=False
+                cur.execute(
+                    """
+                    INSERT INTO environments
+                    (
+                        name,
+                        variables
+                    )
+                    VALUES(%s,%s)
+
+                    ON CONFLICT(name)
+                    DO UPDATE SET
+                    variables =
+                    EXCLUDED.variables
+                    """,
+                    (
+                        name,
+                        json.dumps(
+                            variables,
+                            ensure_ascii=False
+                        )
                     )
                 )
-            )
 
         return jsonify(
             success=True
@@ -571,62 +691,52 @@ def save_environment():
         ), 500
 
 
-# --------------------------------------------------
+# ============================================================
 # EXPORT
-# --------------------------------------------------
+# ============================================================
 
 @app.get("/api/export")
 def export_data():
 
     try:
 
-        with db() as c:
+        with db() as conn:
 
-            saved_rows = c.execute(
-                """
-                SELECT *
-                FROM requests
-                ORDER BY id
-                """
-            ).fetchall()
+            with conn.cursor() as cur:
 
-            saved_columns = [
-                x.name
-                for x in c.description
-            ]
+                cur.execute("""
+                    SELECT *
+                    FROM requests
+                    ORDER BY id
+                """)
 
-            env_rows = c.execute(
-                """
-                SELECT *
-                FROM environments
-                ORDER BY name
-                """
-            ).fetchall()
+                saved_rows = cur.fetchall()
 
-            env_columns = [
-                x.name
-                for x in c.description
-            ]
+                saved_data = row_to_dicts(
+                    saved_rows,
+                    cur.description
+                )
+
+
+                cur.execute("""
+                    SELECT *
+                    FROM environments
+                    ORDER BY name
+                """)
+
+                env_rows = cur.fetchall()
+
+                env_data = row_to_dicts(
+                    env_rows,
+                    cur.description
+                )
+
 
         payload = {
-
-            "saved_requests": [
-                dict(zip(
-                    saved_columns,
-                    row
-                ))
-                for row in saved_rows
-            ],
-
-            "environments": [
-                dict(zip(
-                    env_columns,
-                    row
-                ))
-                for row in env_rows
-            ]
-
+            "saved_requests": saved_data,
+            "environments": env_data
         }
+
 
         return Response(
             json.dumps(
@@ -650,17 +760,20 @@ def export_data():
         ), 500
 
 
-# --------------------------------------------------
+# ============================================================
 # LOCAL DEVELOPMENT
-# --------------------------------------------------
+# ============================================================
 
 if __name__ == "__main__":
 
     if DATABASE_URL:
 
         try:
+
             init_db()
+
         except Exception as e:
+
             print(
                 "Database initialization failed:",
                 e
