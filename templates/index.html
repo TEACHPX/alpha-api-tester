@@ -1,0 +1,56 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PULSE API X</title><link rel="stylesheet" href="/static/style.css">
+</head><body>
+<div class="noise"></div><div class="glow g1"></div><div class="glow g2"></div>
+<div class="app">
+<header>
+ <div class="brand"><div class="mark">ϟ</div><div><strong>PULSE<span>API</span> X</strong><small>ADVANCED REQUEST LAB</small></div></div>
+ <div class="head-actions"><span class="live"><i></i> ENGINE READY</span><a href="/api/export" class="export">⇩ EXPORT</a></div>
+</header>
+
+<div class="layout">
+<aside class="sidebar">
+ <div class="side-title">WORKSPACE</div>
+ <button class="nav active" onclick="view('tester',this)">⌁ Request Lab</button>
+ <button class="nav" onclick="view('history',this)">◷ History <b id="historyCount">0</b></button>
+ <button class="nav" onclick="view('saved',this)">☆ Collections <b id="savedCount">0</b></button>
+ <button class="nav" onclick="view('env',this)">◇ Environments</button>
+ <div class="side-title">TOOLS</div>
+ <button class="nav" onclick="generateCurl()">⌘ cURL Generator</button>
+ <button class="nav" onclick="decodeResponse()">⌗ Response Inspector</button>
+ <div class="tip"><b>TIP</b><br>Use <code>{{token}}</code> anywhere in your URL, headers or body.</div>
+</aside>
+
+<main>
+<section id="tester" class="screen active">
+ <div class="hero"><div><label>REQUEST LAB / 01</label><h1>Build. Fire. <em>Inspect.</em></h1><p>A high-speed API workbench with environments, history, collections and live diagnostics.</p></div>
+ <div class="radar"><span></span><small>LIVE</small></div></div>
+
+ <div class="card request">
+  <div class="cardtop"><span><i class="dot"></i> REQUEST BUILDER</span><select id="envSelect"><option value="">No environment</option></select></div>
+  <div class="urlbar"><select id="method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option><option>HEAD</option><option>OPTIONS</option></select><input id="url" placeholder="https://api.example.com/v1/users/{{id}}"><button onclick="send()">SEND <span>↗</span></button></div>
+  <div class="minirow"><button onclick="formatAll()">✦ Beautify</button><button onclick="save()">＋ Collection</button><button onclick="copyCurl()">⌘ Copy cURL</button><button onclick="resetReq()">↺ Reset</button></div>
+  <div class="editgrid">
+   <div class="editor"><div><b>HEADERS</b><small>JSON</small></div><textarea id="headers">{}</textarea></div>
+   <div class="editor"><div><b>BODY</b><small>JSON / RAW</small></div><textarea id="body" placeholder='{"hello":"world"}'></textarea></div>
+  </div>
+ </div>
+
+ <div class="card response">
+  <div class="resphead"><span><i class="dot cyan"></i> RESPONSE</span><span id="meta">STANDBY</span></div>
+  <div class="metrics"><div><small>STATUS</small><b id="status">—</b></div><div><small>TIME</small><b id="time">—</b></div><div><small>TYPE</small><b id="rtype">—</b></div><div><small>SIZE</small><b id="size">—</b></div></div>
+  <div class="tabs"><button class="tab active" onclick="tab('pretty',this)">Pretty</button><button class="tab" onclick="tab('raw',this)">Raw</button><button class="tab" onclick="tab('rh',this)">Headers</button></div>
+  <pre id="pretty" class="out">Fire a request to inspect the response.</pre><pre id="raw" class="out hidden"></pre><pre id="rh" class="out hidden"></pre>
+ </div>
+</section>
+
+<section id="history" class="screen"><div class="sectiontitle"><label>WORKSPACE / 02</label><h2>Request History</h2><button onclick="clearHistory()">Clear all</button></div><div class="card list" id="historyList">Loading...</div></section>
+<section id="saved" class="screen"><div class="sectiontitle"><label>WORKSPACE / 03</label><h2>Collections</h2><button onclick="loadSaved()">Refresh</button></div><div class="card list" id="savedList">Loading...</div></section>
+<section id="env" class="screen"><div class="sectiontitle"><label>WORKSPACE / 04</label><h2>Environments</h2></div>
+ <div class="card envcard"><p>Create variables such as <code>token</code>, <code>base_url</code> and <code>id</code>.</p><input id="envName" placeholder="Environment name"><textarea id="envVars" placeholder='{"token":"abc123","base_url":"https://example.com"}'></textarea><button onclick="saveEnv()">Save Environment</button></div>
+ <div class="card list" id="envList"></div>
+</section>
+</main></div><footer>PULSE API X <span>•</span> LOCAL-FIRST DEVELOPER WORKBENCH</footer></div>
+<script src="/static/app.js"></script></body></html>
