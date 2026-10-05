@@ -7,7 +7,7 @@ import os
 
 app = Flask(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://neondb_owner:npg_Ayb0LXi2kcGe@ep-shy-sky-b5ugtj4f-pooler.c-7.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require").strip()
 
 
 # --------------------------------------------------
